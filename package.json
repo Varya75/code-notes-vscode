@@ -1,0 +1,35 @@
+
+{
+  "name": "code-notes",
+  "displayName": "Code Notes",
+  "description": "Плагин для создания и управления заметками к исходному коду",
+  "version": "1.0.0",
+  "publisher": "varya",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeNotes.create",
+        "title": "Создать заметку к коду"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.3.3"
+  }
+}
