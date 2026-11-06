@@ -1,4 +1,14 @@
+
 import * as vscode from 'vscode';
+
+interface CodeNote {
+    id: string;
+    file: string;
+    code: string;
+    note: string;
+    line: number;
+    createdAt: string;
+}
 
 export function activate(context: vscode.ExtensionContext) {
     const createNoteCommand = vscode.commands.registerCommand(
@@ -28,12 +38,48 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            vscode.window.showInformationMessage(
-                `Заметка создана: ${note}`
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+            if (!workspaceFolder) {
+                vscode.window.showWarningMessage(
+                    'Сначала откройте папку проекта!'
+                );
+                return;
+            }
+
+            const notesFile = vscode.Uri.joinPath(
+                workspaceFolder.uri,
+                '.code-notes.json'
             );
 
-            console.log('Выделенный код:', selectedText);
-            console.log('Текст заметки:', note);
+            let notes: CodeNote[] = [];
+
+            try {
+                const content = await vscode.workspace.fs.readFile(notesFile);
+                notes = JSON.parse(Buffer.from(content).toString('utf8'));
+            } catch {
+                notes = [];
+            }
+
+            const newNote: CodeNote = {
+                id: Date.now().toString(),
+                file: vscode.workspace.asRelativePath(editor.document.uri),
+                code: selectedText,
+                note: note.trim(),
+                line: selection.start.line + 1,
+                createdAt: new Date().toISOString()
+            };
+
+            notes.push(newNote);
+
+            await vscode.workspace.fs.writeFile(
+                notesFile,
+                Buffer.from(JSON.stringify(notes, null, 4), 'utf8')
+            );
+
+            vscode.window.showInformationMessage(
+                'Заметка сохранена!'
+            );
         }
     );
 
