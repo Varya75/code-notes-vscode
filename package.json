@@ -17,11 +17,19 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      {
+    {
         "command": "codeNotes.create",
         "title": "Создать заметку к коду"
-      }
-    ]
+    },
+    {
+        "command": "codeNotes.show",
+        "title": "Показать заметки"
+    },
+    {
+        "command": "codeNotes.delete",
+        "title": "Удалить заметку"
+    }
+  ]
   },
   "scripts": {
     "compile": "tsc -p ./",

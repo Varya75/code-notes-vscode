@@ -10,6 +10,45 @@ interface CodeNote {
     createdAt: string;
 }
 
+async function getNotesFile(): Promise<vscode.Uri | undefined> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+    if (!workspaceFolder) {
+        vscode.window.showWarningMessage('Сначала откройте папку проекта!');
+        return undefined;
+    }
+
+    return vscode.Uri.joinPath(workspaceFolder.uri, '.code-notes.json');
+}
+
+async function readNotes(): Promise<CodeNote[]> {
+    const notesFile = await getNotesFile();
+
+    if (!notesFile) {
+        return [];
+    }
+
+    try {
+        const content = await vscode.workspace.fs.readFile(notesFile);
+        return JSON.parse(Buffer.from(content).toString('utf8'));
+    } catch {
+        return [];
+    }
+}
+
+async function saveNotes(notes: CodeNote[]) {
+    const notesFile = await getNotesFile();
+
+    if (!notesFile) {
+        return;
+    }
+
+    await vscode.workspace.fs.writeFile(
+        notesFile,
+        Buffer.from(JSON.stringify(notes, null, 4), 'utf8')
+    );
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const createNoteCommand = vscode.commands.registerCommand(
         'codeNotes.create',
@@ -17,9 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
             const editor = vscode.window.activeTextEditor;
 
             if (!editor) {
-                vscode.window.showWarningMessage(
-                    'Сначала откройте файл с исходным кодом!'
-                );
+                vscode.window.showWarningMessage('Сначала откройте файл с исходным кодом!');
                 return;
             }
 
@@ -38,28 +75,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-
-            if (!workspaceFolder) {
-                vscode.window.showWarningMessage(
-                    'Сначала откройте папку проекта!'
-                );
-                return;
-            }
-
-            const notesFile = vscode.Uri.joinPath(
-                workspaceFolder.uri,
-                '.code-notes.json'
-            );
-
-            let notes: CodeNote[] = [];
-
-            try {
-                const content = await vscode.workspace.fs.readFile(notesFile);
-                notes = JSON.parse(Buffer.from(content).toString('utf8'));
-            } catch {
-                notes = [];
-            }
+            const notes = await readNotes();
 
             const newNote: CodeNote = {
                 id: Date.now().toString(),
@@ -71,19 +87,82 @@ export function activate(context: vscode.ExtensionContext) {
             };
 
             notes.push(newNote);
+            await saveNotes(notes);
 
-            await vscode.workspace.fs.writeFile(
-                notesFile,
-                Buffer.from(JSON.stringify(notes, null, 4), 'utf8')
-            );
+            vscode.window.showInformationMessage('Заметка сохранена!');
+        }
+    );
+
+    const showNotesCommand = vscode.commands.registerCommand(
+        'codeNotes.show',
+        async () => {
+            const notes = await readNotes();
+
+            if (notes.length === 0) {
+                vscode.window.showInformationMessage('Сохранённых заметок пока нет.');
+                return;
+            }
+
+            const items = notes.map(note => ({
+                label: note.note,
+                description: `${note.file}:${note.line}`,
+                detail: note.code || 'Фрагмент кода не сохранён',
+                noteId: note.id
+            }));
+
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Сохранённые заметки'
+            });
+
+            if (!selected) {
+                return;
+            }
 
             vscode.window.showInformationMessage(
-                'Заметка сохранена!'
+                `${selected.description}: ${selected.label}`
             );
         }
     );
 
-    context.subscriptions.push(createNoteCommand);
+    const deleteNoteCommand = vscode.commands.registerCommand(
+        'codeNotes.delete',
+        async () => {
+            const notes = await readNotes();
+
+            if (notes.length === 0) {
+                vscode.window.showInformationMessage('Нет заметок для удаления.');
+                return;
+            }
+
+            const items = notes.map(note => ({
+                label: note.note,
+                description: `${note.file}:${note.line}`,
+                noteId: note.id
+            }));
+
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Выберите заметку для удаления'
+            });
+
+            if (!selected) {
+                return;
+            }
+
+            const updatedNotes = notes.filter(
+                note => note.id !== selected.noteId
+            );
+
+            await saveNotes(updatedNotes);
+
+            vscode.window.showInformationMessage('Заметка удалена!');
+        }
+    );
+
+    context.subscriptions.push(
+        createNoteCommand,
+        showNotesCommand,
+        deleteNoteCommand
+    );
 }
 
 export function deactivate() {}
